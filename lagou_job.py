@@ -2,6 +2,8 @@ import requests
 import codecs
 import time
 import csv
+import hashlib
+from lxml import etree
 
 URL = 'https://www.lagou.com/jobs/positionAjax.json?city=%E5%B9%BF%E5%B7%9E&needAddtionalResult=false'
 
@@ -15,18 +17,29 @@ data = {
     'kd': 'python'
 }
 
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.80 Safari/537.36',
+    'Accept': 'application/json, text/javascript, */*; q=0.01',
+    'Host': 'www.lagou.com',
+    'Origin': 'https://www.lagou.com',
+    'Referer': 'https://www.lagou.com/jobs/list_python?labelWords=&fromSearch=true&suginput='
+}
+
 
 def get_json():
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.80 Safari/537.36',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Host': 'www.lagou.com',
-        'Origin': 'https://www.lagou.com',
-        'Referer': 'https://www.lagou.com/jobs/list_python?labelWords=&fromSearch=true&suginput='
-    }
+
     #para = {'city': '%E5%B9%BF%E5%B7%9E', 'needAddtionalResult': 'false'}
     page_lagou = requests.post(URL, headers=headers, data=data, cookies=cookie)
-    #print(page_lagou.url)
+    # print(page_lagou.url)
+
+    # 状态检测
+    if page_lagou.status_code == 302 or page_lagou.status_code == 301:
+        proxy, auth = get_proxy()
+        proxy_header = headers
+        proxy_header["Proxy-Authorization"] = auth
+        page_lagou = requests.post(
+            URL, headers=headers, data=data, cookies=cookie, proxies=proxy)
+
     page_lagou.encoding = 'utf-8'
     json_content = page_lagou.json()
     job_info = json_content['content']['positionResult']['result']
@@ -44,6 +57,35 @@ def process_info():
                     [job['companyFullName'], job['positionName'], job['businessZones'], job['salary']])
 
             time.sleep(5*3)
+
+
+def get_proxy():
+
+    orderno = "ZF20179xxxxxxxxx"
+    secret = "3f9c2ecac7xxxxxxxxxxxxxxxx"
+
+    ip = "forward.xdaili.cn"
+    port = "80"
+
+    ip_port = ip + ":" + port
+
+    timestamp = str(int(time.time()))                # 计算时间戳
+    string = ""
+    string = "orderno=" + orderno + "," + "secret=" + \
+        secret + "," + "timestamp=" + timestamp
+
+    string = string.encode()
+
+    md5_string = hashlib.md5(string).hexdigest()                 # 计算sign
+    sign = md5_string.upper()                              # 转换成大写
+    print(sign)
+    auth = "sign=" + sign + "&" + "orderno=" + \
+        orderno + "&" + "timestamp=" + timestamp
+
+    print(auth)
+    proxy = {"http": "http://" + ip_port, "https": "https://" + ip_port}
+
+    return proxy, auth
 
 
 def main():
